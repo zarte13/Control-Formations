@@ -24,7 +24,7 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            "solution.py",
+            "solution = solution_du_siecle.solution:main",
         ],
     },
 )
