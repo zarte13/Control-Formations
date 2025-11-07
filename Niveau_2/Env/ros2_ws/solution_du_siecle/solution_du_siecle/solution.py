@@ -12,7 +12,6 @@ class MissionNode(Node):
         # State machine  
         self.state = "WAIT_CONNECTION"  
         self.mission_start_time = None  
-        self.balloon_messages = []  
           
         # MAVROS state subscriber  
         self.state_sub = self.create_subscription(  
@@ -41,9 +40,13 @@ class MissionNode(Node):
           
         # Current state  
         self.current_state = State()  
+        self.latest_balloon_pose = None  
           
         # State machine timer (runs at 10 Hz)  
         self.state_machine_timer = self.create_timer(0.1, self.state_machine_callback)  
+          
+        # Tracking timer (runs at 10 Hz when tracking)  
+        self.tracking_timer = None  
           
         self.get_logger().info("Mission node started")  
       
@@ -51,13 +54,39 @@ class MissionNode(Node):
         self.current_state = msg  
       
     def balloon_callback(self, msg: PoseStamped):  
-        """Store balloon pose messages during observation phase"""  
-        if self.state == "OBSERVE_BALLOON":  
-            self.balloon_messages.append(msg)  
+        """Store latest balloon pose for tracking"""  
+        self.latest_balloon_pose = msg  
+        if self.state == "FOLLOW_BALLOON":  
             self.get_logger().info(  
                 f"Balloon pose - Position: [{msg.pose.position.x:.2f}, "  
                 f"{msg.pose.position.y:.2f}, {msg.pose.position.z:.2f}] (ENU)"  
             )  
+      
+    def follow_balloon_callback(self):  
+        """Timer callback to continuously track balloon position"""  
+        if self.latest_balloon_pose is not None:  
+            # Create position target from balloon pose  
+            pos_msg = PositionTarget()  
+            pos_msg.coordinate_frame = PositionTarget.FRAME_LOCAL_NED  
+            pos_msg.type_mask = (  
+                PositionTarget.IGNORE_VX |  
+                PositionTarget.IGNORE_VY |  
+                PositionTarget.IGNORE_VZ |  
+                PositionTarget.IGNORE_AFX |  
+                PositionTarget.IGNORE_AFY |  
+                PositionTarget.IGNORE_AFZ |  
+                PositionTarget.IGNORE_YAW_RATE  
+            )  
+              
+            # Convert ENU to NED coordinates  
+            # ENU: x=East, y=North, z=Up  
+            # NED: x=North, y=East, z=Down  
+            pos_msg.position.x = self.latest_balloon_pose.pose.position.y  # North  
+            pos_msg.position.y = self.latest_balloon_pose.pose.position.x  # East  
+            pos_msg.position.z = self.latest_balloon_pose.pose.position.z  # Up
+            pos_msg.yaw = 0.0  
+              
+            self.position_pub.publish(pos_msg)  
       
     def state_machine_callback(self):  
         """Main state machine - executes mission steps"""  
@@ -147,16 +176,21 @@ class MissionNode(Node):
             arrival_msg = String()  
             arrival_msg.data = "Philippe"  
             self.arrival_pub.publish(arrival_msg)  
-            self.state = "OBSERVE_BALLOON"  
+            self.state = "FOLLOW_BALLOON"  
             self.state_start_time = self.get_clock().now()  
-            self.balloon_messages = []  
               
-        elif self.state == "OBSERVE_BALLOON":  
+            # Start tracking timer at 10 Hz  
+            self.tracking_timer = self.create_timer(0.1, self.follow_balloon_callback)  
+            self.get_logger().info("Started following balloon...")  
+              
+        elif self.state == "FOLLOW_BALLOON":  
             elapsed = (self.get_clock().now() - self.state_start_time).nanoseconds / 1e9  
-            if elapsed >= 30.0:  
-                self.get_logger().info(  
-                    f"Observation complete. Received {len(self.balloon_messages)} balloon poses"  
-                )  
+            if elapsed >= 120.0:  
+                self.get_logger().info("Tracking complete (120 seconds)")  
+                # Stop tracking timer  
+                if self.tracking_timer is not None:  
+                    self.tracking_timer.cancel()  
+                    self.tracking_timer = None  
                 self.state = "RTL"  
               
         elif self.state == "RTL":  
