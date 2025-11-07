@@ -57,6 +57,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-mavlink \
     geographiclib-tools \
     ros-humble-demo-nodes-cpp \
+    ros-humble-rmw-zenoh-cpp \
     ros-dev-tools \
     python3-rosdep \
     python3-argcomplete \
@@ -92,3 +93,16 @@ RUN ["/bin/bash", "-c", "source /opt/ros/humble/setup.bash && colcon build"]
 # Add sourcing to .bashrc using bash
 RUN ["/bin/bash", "-c", "echo 'source /opt/ros/humble/setup.bash' >> /root/.bashrc"]
 RUN ["/bin/bash", "-c", "echo 'source /ros2_ws/install/setup.bash' >> /root/.bashrc"]
+
+ARG USERNAME=phil
+ARG USER_UID=1000
+ARG USER_GID=1000
+
+RUN groupadd -g ${USER_GID} ${USERNAME} \
+    && useradd -m -u ${USER_UID} -g ${USER_GID} -s /bin/bash ${USERNAME} \
+    && mkdir -p /ros2_ws \
+    && chown -R ${USER_UID}:${USER_GID} /ros2_ws
+
+USER ${USERNAME}
+WORKDIR /ros2_ws
+ENV HOME=/home/${USERNAME}
