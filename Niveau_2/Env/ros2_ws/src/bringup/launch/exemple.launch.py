@@ -5,12 +5,22 @@ from launch_ros.actions import Node
 def generate_launch_description():
     return LaunchDescription([
         Node(
-            package='mission',
-            executable='exemple',   # mission/colin_drone_node.py : main()
-            name='exemple',
+            package="mavros",
+            executable="mavros_node",
+            output="screen",
+            parameters=[
+                {
+                    "fcu_url": "tcp://192.168.0.35:5762",
+                    "tgt_system": 1,
+                    "tgt_component": 1,
+                }
+            ],
+        ),
+        Node(
+            package='solution_du_siecle',
+            executable='ardupilotcontroller',   # mission/colin_drone_node.py : main()
+            name='ardupilot_controller',
             output='screen',
-            parameters=[{'look_ahead' : 2.0,
-                         'takeoff_alt' : 10.0}]
         ),
         Node(
             package='mission_control',

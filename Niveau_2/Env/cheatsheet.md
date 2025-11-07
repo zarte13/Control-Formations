@@ -20,6 +20,8 @@ tcp:192.168.0.35:5762
 ros2 run mavros mavros_node --ros-args -p fcu_url:=tcp://192.168.0.35:5762 -p tgt_system:=1 -p tgt_component:=1
 
 
+ros2 launch bringup exemple.launch.py
+
 
 
 3 nodes:
