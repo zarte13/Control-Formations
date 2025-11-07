@@ -25,6 +25,7 @@ setup(
     entry_points={
         'console_scripts': [
             "solution = solution_du_siecle.solution:main",
+            "ardupilotcontroller = solution_du_siecle.ardupilotcontroller:main"
         ],
     },
 )
